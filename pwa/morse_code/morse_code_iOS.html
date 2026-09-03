@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  
+  <!-- 📱 iOS PWA (加入主畫面) 專用設定 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MORSE CODE PCB">
+  
+  <!-- PWA Manifest 與主題顏色設定 -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f1115">
+  
+  <title>MORSE CODE PCB</title>
+  <style>
+    :root {
+      --pcb-bg: #14171c;
+      --pcb-gold: #c5a880;
+      --pcb-trace: #2a313d;
+      --pcb-active: #00ff66;
+      --pcb-rect-fill: #3a3328;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #0f1115;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100vw;
+      min-height: 100dvh; /* 改為 dvh 以適應 iOS 網址列動態高度 */
+      color: #e0e0e0;
+      overflow-x: hidden;
+      touch-action: manipulation; /* 停用雙擊縮放，優化 iOS 連點體驗 */
+    }
+
+    /* 左右雙欄主容器 */
+    .workspace {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      width: 100%;
+      max-width: 940px;
+      height: 100%;
+      max-height: 600px;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    /* 左側：PCB 電路板 */
+    .card-container {
+      position: relative;
+      background-color: var(--pcb-bg);
+      border: 4px solid var(--pcb-gold);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+      width: 320px;
+      user-select: none;
+      -webkit-user-select: none; /* iOS 專用 */
+      flex-shrink: 0;
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* 右側：控制與設定欄 */
+    .controls-column {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      width: 340px;
+      height: 480px;
+      flex-shrink: 0;
+    }
+
+    .header-group h1 {
+      margin: 0 0 5px 0;
+      color: var(--pcb-gold);
+      font-size: 22px;
+    }
+
+    .header-group .subtitle {
+      margin: 0;
+      font-size: 13px;
+      color: #888;
+    }
+
+    /* 配置區 */
+    .config-section {
+      background-color: #1a1d24;
+      border: 1px solid #2d333f;
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .config-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .config-row label {
+      color: #aaa;
+    }
+
+    /* 佈局選擇器 */
+    .config-row select {
+      background-color: #14171c;
+      border: 1px solid var(--pcb-gold);
+      color: var(--pcb-active);
+      border-radius: 4px;
+      padding: 4px 6px;
+      outline: none;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .config-row input[type="text"] {
+      background-color: #14171c;
+      border: 1px solid var(--pcb-gold);
+      color: var(--pcb-active);
+      border-radius: 4px;
+      padding: 4px 8px;
+      width: 100px;
+      text-align: center;
+      cursor: pointer;
+      font-weight: bold;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .config-row input[type="range"] {
+      accent-color: var(--pcb-active);
+      width: 80px;
+    }
+
+    /* 顯示面板 */
+    .control-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .display-box {
+      background-color: #1a1d24;
+      border: 1px solid #2d333f;
+      border-radius: 8px;
+      padding: 8px 12px;
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .display-label {
+      font-size: 11px;
+      color: var(--pcb-gold);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .display-value {
+      font-size: 18px;
+      font-weight: bold;
+      letter-spacing: 2px;
+    }
+
+    #decoded-text {
+      color: #fff;
+      font-family: monospace;
+    }
+
+    #current-code {
+      color: var(--pcb-active);
+      text-shadow: 0 0 8px rgba(0,255,102,0.5);
+    }
+
+    /* 按鈕樣式 */
+    .action-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #tap-btn {
+      background-color: #243b2f;
+      border: 2px solid var(--pcb-active);
+      color: var(--pcb-active);
+      border-radius: 8px;
+      height: 50px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.1s, transform 0.05s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #tap-btn:active, #tap-btn.active-style {
+      background-color: var(--pcb-active);
+      color: #14171c;
+      box-shadow: 0 0 15px var(--pcb-active);
+      transform: scale(0.97);
+    }
+
+    .backspace-btn {
+      background-color: #1a1d24;
+      border: 1px solid var(--pcb-gold);
+      color: var(--pcb-gold);
+      border-radius: 8px;
+      padding: 6px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex: 1;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .backspace-btn:hover {
+      background-color: var(--pcb-gold);
+      color: #14171c;
+    }
+
+    .clear-btn {
+      background-color: #1a1d24;
+      border: 1px solid #d32f2f;
+      color: #d32f2f;
+      border-radius: 8px;
+      padding: 6px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex: 1;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .clear-btn:hover {
+      background-color: #d32f2f;
+      color: #fff;
+    }
+
+    /* 說明區 */
+    .instructions {
+      font-size: 11px;
+      color: #777;
+      line-height: 1.4;
+      border-top: 1px solid #222;
+      padding-top: 8px;
+    }
+
+    /* SVG 繪製 */
+    .trace {
+      stroke: var(--pcb-trace);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      transition: stroke 0.15s ease, filter 0.15s ease;
+    }
+
+    .trace.active {
+      stroke: var(--pcb-active);
+      filter: drop-shadow(0px 0px 4px var(--pcb-active));
+    }
+
+    .node-circle {
+      fill: var(--pcb-bg);
+      stroke: var(--pcb-gold);
+      stroke-width: 2.5;
+      transition: all 0.15s ease;
+    }
+
+    .node-rect {
+      fill: var(--pcb-rect-fill);
+      stroke: var(--pcb-gold);
+      stroke-width: 2.5;
+      transition: all 0.15s ease;
+    }
+
+    .node-circle.active, .node-rect.active {
+      fill: var(--pcb-active);
+      stroke: #fff;
+      filter: drop-shadow(0px 0px 6px var(--pcb-active));
+    }
+
+    .node-text {
+      fill: var(--pcb-gold);
+      font-size: 12px;
+      font-weight: bold;
+      font-family: system-ui, sans-serif;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      transition: fill 0.15s ease;
+    }
+
+    .node-text.active {
+      fill: #fff;
+      font-weight: 900;
+    }
+
+    .corner-hole {
+      fill: #d32f2f;
+      stroke: #fff;
+      stroke-width: 1;
+      transition: cx 0.3s ease;
+    }
+
+    #antenna {
+      transition: transform 0.3s ease;
+    }
+
+    /* iPhone Home鍵樣式 (SVG 內) */
+    #svg-home-btn {
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #svg-home-btn.active #home-btn-ring {
+      stroke: var(--pcb-active);
+      fill: #1d3326;
+      filter: drop-shadow(0px 0px 8px var(--pcb-active));
+    }
+
+    #svg-home-btn.active #home-btn-square {
+      stroke: var(--pcb-active);
+    }
+
+    /* SVG 退格鍵樣式 */
+    #svg-backspace-btn {
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #svg-backspace-btn:hover #svg-backspace-rect {
+      fill: #1d212b;
+    }
+
+    #svg-backspace-btn.active-style #svg-backspace-rect {
+      fill: var(--pcb-active);
+      stroke: #fff;
+      filter: drop-shadow(0px 0px 8px var(--pcb-active));
+    }
+
+    #svg-backspace-btn.active-style path {
+      stroke: #14171c;
+    }
+
+    /* 📱 iPhone 滿版與自然向下滾動優化 */
+    @media (max-width: 720px) {
+      body {
+        overflow-y: auto !important;
+        height: auto !important;
+        min-height: 100dvh !important; /* 使用 dvh 避免 Safari 底部白邊 */
+        width: 100vw !important;
+      }
+      .workspace {
+        flex-direction: column;
+        height: auto !important;
+        max-height: none !important;
+        gap: 35px; /* 增加兩頁間的視覺間距 */
+        padding: 15px 10px;
+        justify-content: flex-start;
+        align-items: center;
+      }
+      .card-container {
+        width: auto !important;
+        height: calc(100dvh - 50px) !important; /* 扣除安全邊界，讓電路板在第一頁完美滿版 */
+        max-height: none !important;
+        max-width: 95vw !important;
+        flex-shrink: 0 !important;
+      }
+      .controls-column {
+        width: 100% !important;
+        max-width: 360px !important;
+        height: auto !important;
+        max-height: none !important; /* 展開為第二頁 */
+        justify-content: flex-start;
+        gap: 16px;
+        flex-shrink: 0 !important;
+        padding-bottom: 60px; /* 底部安全距離，防止遮擋按鈕 */
+      }
+      
+      .header-group {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+      .header-group h1 {
+        font-size: 20px;
+        margin: 0;
+      }
+      .header-group .subtitle, .instructions {
+        display: block !important;
+        font-size: 12px;
+        color: #888;
+      }
+      .config-section {
+        padding: 12px;
+        gap: 8px;
+      }
+      .config-row {
+        font-size: 12px;
+      }
+      .config-row input[type="range"] {
+        width: 80px;
+      }
+      .display-box {
+        padding: 8px 12px;
+        min-height: 34px;
+      }
+      .display-value {
+        font-size: 18px;
+      }
+      #tap-btn {
+        height: 50px;
+        font-size: 14px;
+      }
+      .backspace-btn, .clear-btn {
+        padding: 6px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="workspace">
+    <!-- 左側：PCB 卡片 -->
+    <div class="card-container pcb-active-layout">
+      <svg id="board-svg" viewBox="0 0 360 540" width="100%" height="100%">
+        <defs>
+          <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+
+        <!-- 右上角定位孔 -->
+        <circle id="corner-hole" cx="335" cy="25" r="8" class="corner-hole" />
+
+        <!-- 頂部 PCB 邊框解碼顯示框與退格鍵 -->
+        <g id="top-display-group">
+          <rect id="top-display-rect" x="55" y="15" width="204" height="38" rx="6" fill="#14171c" stroke="var(--pcb-gold)" stroke-width="2.5" />
+          <text id="top-display-label" x="65" y="27" fill="var(--pcb-gold)" font-size="9" font-family="system-ui, sans-serif" font-weight="bold" letter-spacing="1">解碼輸出</text>
+          <text id="top-display-text" x="157" y="41" fill="#fff" font-size="16" font-family="monospace" font-weight="bold" text-anchor="middle"></text>
+
+          <!-- SVG 內置退格鍵 -->
+          <g id="svg-backspace-btn" transform="translate(267, 15)">
+            <rect id="svg-backspace-rect" x="0" y="0" width="38" height="38" rx="6" fill="#14171c" stroke="var(--pcb-gold)" stroke-width="2.5" style="transition: all 0.1s ease;" />
+            <path d="M 9 19 L 15 13 H 29 V 25 H 15 Z" stroke="var(--pcb-gold)" stroke-width="2" stroke-linejoin="round" fill="none" style="transition: stroke 0.1s ease;" />
+            <path d="M 19 16 L 24 22 M 24 16 L 19 22" stroke="var(--pcb-gold)" stroke-width="2" stroke-linecap="round" fill="none" style="transition: stroke 0.1s ease;" />
+          </g>
+        </g>
+
+        <!-- 天線起點圖標 -->
+        <g id="antenna" stroke="#c5a880" stroke-width="2" fill="none">
+          <path d="M 170 15 L 180 3 L 190 15 M 175 10 L 180 3 L 185 10 M 180 3 L 180 15" />
+        </g>
+
+        <!-- 走線與節點圖層 -->
+        <g id="traces-layer"></g>
+        <g id="nodes-layer"></g>
+
+        <!-- 下方嵌入式 iPhone Home 鍵造型發報電鍵 -->
+        <g id="svg-home-btn">
+          <circle id="home-btn-ring" cx="180" cy="495" r="28" fill="#14171c" stroke="var(--pcb-gold)" stroke-width="3" style="transition: all 0.1s ease;" />
+          <rect id="home-btn-square" x="168" y="483" width="24" height="24" rx="5" fill="none" stroke="var(--pcb-gold)" stroke-width="2" style="transition: all 0.1s ease;" />
+          <circle class="home-btn-touch" cx="180" cy="495" r="38" fill="transparent" style="cursor: pointer;" />
+        </g>
+      </svg>
+    </div>
+
+    <!-- 右側：控制台 -->
+    <div class="controls-column">
+      <div class="header-group">
+        <h1>摩斯解碼電路板</h1>
+        <div class="subtitle">單按鍵發報與雙佈局切換</div>
+      </div>
+
+      <!-- 配置設定區 -->
+      <div class="config-section">
+        <div class="config-row">
+          <label for="layout-select">面板佈局：</label>
+          <select id="layout-select">
+            <option value="pcb" selected>實物 PCB 版本</option>
+            <option value="binary">對稱二叉樹版本</option>
+          </select>
+        </div>
+        <div class="config-row">
+          <label for="key-input">自訂鍵盤按鍵：</label>
+          <input type="text" id="key-input" value="." readonly title="點擊並按下鍵盤任意鍵以更換">
+        </div>
+        <div class="config-row">
+          <label for="height-input">節點行距 (像素)：</label>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <input type="range" id="height-input" min="40" max="80" step="2" value="60">
+            <span id="height-val" style="width: 32px; font-weight: bold; color: var(--pcb-active);">60</span>
+          </div>
+        </div>
+        <div class="config-row">
+          <label for="threshold-input">長按判定 (毫秒)：</label>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <input type="range" id="threshold-input" min="50" max="500" step="10" value="150">
+            <span id="threshold-val" style="width: 32px; font-weight: bold; color: var(--pcb-active);">150</span>
+          </div>
+        </div>
+        <div class="config-row">
+          <label for="commit-input">自動確認 (毫秒)：</label>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <input type="range" id="commit-input" min="300" max="2500" step="100" value="1000">
+            <span id="commit-val" style="width: 32px; font-weight: bold; color: var(--pcb-active);">1000</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 顯示面板 -->
+      <div class="control-panel">
+        <div class="display-box">
+          <span class="display-label">當前輸入:</span>
+          <span id="current-code" class="display-value">-</span>
+        </div>
+        
+        <div class="display-box">
+          <span class="display-label">解碼輸出:</span>
+          <span id="decoded-text" class="display-value"></span>
+        </div>
+      </div>
+
+      <!-- 發報與控制按鈕 -->
+      <div class="action-group">
+        <button id="tap-btn">點擊 / 按住此電鍵發報</button>
+        <div style="display: flex; gap: 8px; width: 100%;">
+          <button class="backspace-btn" onclick="backspace()">退格 (Backspace)</button>
+          <button class="clear-btn" onclick="clearAll()">清除歷史記錄</button>
+        </div>
+      </div>
+
+      <div class="instructions">
+        <b>操作指南：</b><br>
+        1. <b>短按</b>發送 滴 (•)，按住超過設定毫秒即為 <b>長按</b> 嗒 (—)。<br>
+        2. 手指放開後，停止輸入達「自動確認時間」會<b>自動解碼並印出字母</b>。<br>
+        3. 輸入大於 4 次或無對應字母時，時間一到亦會解碼並印出 <b>"?"</b>。
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 實物 PCB 基礎坐標
+    let baseY = 90;
+    let deltaY = 60;
+
+    // 實物 PCB 節點
+    const nodesData = [
+      { id: 'E', code: '.', x: 220, get y() { return baseY; }, type: 'circle', tx: 0, ty: -18 },
+      { id: 'I', code: '..', x: 260, get y() { return baseY; }, type: 'circle', tx: 0, ty: -18 },
+      { id: 'S', code: '...', x: 300, get y() { return baseY; }, type: 'circle', tx: 0, ty: -18 },
+      { id: 'H', code: '....', x: 340, get y() { return baseY; }, type: 'circle', tx: 0, ty: -18 },
+      { id: 'U', code: '..-', x: 260, get y() { return baseY + 1 * deltaY; }, type: 'rect', tx: 0, ty: -18 },
+      { id: 'F', code: '..-.', x: 260, get y() { return baseY + 2 * deltaY; }, type: 'circle', tx: 0, ty: -18 },
+      { id: 'V', code: '...-', x: 300, get y() { return baseY + 1 * deltaY; }, type: 'rect', tx: 0, ty: -18 },
+      { id: 'A', code: '.-', x: 220, get y() { return baseY + 3 * deltaY; }, type: 'rect', tx: 0, ty: -18 },
+      { id: 'R', code: '.-.', x: 260, get y() { return baseY + 3 * deltaY; }, type: 'circle', tx: 0, ty: -18 },
+      { id: 'L', code: '.-..', x: 300, get y() { return baseY + 3 * deltaY; }, type: 'circle', tx: 0, ty: -18 },
+      { id: 'W', code: '.--', x: 220, get y() { return baseY + 5 * deltaY; }, type: 'rect', tx: 0, ty: -18 },
+      { id: 'P', code: '.--.', x: 260, get y() { return baseY + 5 * deltaY; }, type: 'circle', tx: 0, ty: -18 },
+      { id: 'J', code: '.---', x: 220, get y() { return baseY + 6 * deltaY; }, type: 'rect', tx: 0, ty: -18 },
+      { id: 'T', code: '-', x: 140, get y() { return baseY; }, type: 'rect', tx: 0, ty: -18 },
+      { id: 'M', code: '--', x: 100, get y() { return baseY; }, type: 'rect', tx: 0, ty: -18 },
+      { id: 'O', code: '---', x: 60, get y() { return baseY; }, type: 'rect', tx: 0, ty: -18 },
+      { id: 'G', code: '--.', x: 100, get y() { return baseY + 1 * deltaY; }, type: 'circle', tx: 0, ty: -18 },
+      { id: 'Q', code: '--.-', x: 60, get y() { return baseY + 2 * deltaY; }, type: 'rect', tx: 0, ty: -18 },
+      { id: 'Z', code: '--..', x: 100, get y() { return baseY + 2 * deltaY; }, type: 'circle', tx: 0, ty: -18 },
+      { id: 'N', code: '-.', x: 140, get y() { return baseY + 3 * deltaY; }, type: 'circle', tx: 0, ty: -18 },
+      { id: 'K', code: '-.-', x: 100, get y() { return baseY + 3 * deltaY; }, type: 'rect', tx: 0, ty: -18 },
+      { id: 'Y', code: '-.--', x: 60, get y() { return baseY + 3 * deltaY; }, type: 'rect', tx: 0, ty: -18 },
+      { id: 'C', code: '-.-.', x: 100, get y() { return baseY + 4 * deltaY; }, type: 'circle', tx: 0, ty: -18 },
+      { id: 'D', code: '-..', x: 140, get y() { return baseY + 5 * deltaY; }, type: 'circle', tx: 0, ty: -18 },
+      { id: 'X', code: '-..-', x: 100, get y() { return baseY + 5 * deltaY; }, type: 'rect', tx: 0, ty: -18 },
+      { id: 'B', code: '-...', x: 140, get y() { return baseY + 6 * deltaY; }, type: 'circle', tx: 0, ty: -18 }
+    ];
+
+    // 動態生成實物 PCB 走線路徑
+    function getTracesConfig() {
+      return [
+        { code: '.', d: `M 180 ${baseY - 25} V ${baseY} H 220` },
+        { code: '..', d: `M 220 ${baseY} H 260` },
+        { code: '...', d: `M 260 ${baseY} H 300` },
+        { code: '....', d: `M 300 ${baseY} H 340` },
+        { code: '..-', d: `M 260 ${baseY} V ${baseY + 1 * deltaY}` },
+        { code: '..-.', d: `M 260 ${baseY + 1 * deltaY} V ${baseY + 2 * deltaY}` },
+        { code: '...-', d: `M 300 ${baseY} V ${baseY + 1 * deltaY}` },
+        { code: '.-', d: `M 220 ${baseY} V ${baseY + 3 * deltaY}` },
+        { code: '.-.', d: `M 220 ${baseY + 3 * deltaY} H 260` },
+        { code: '.-..', d: `M 260 ${baseY + 3 * deltaY} H 300` },
+        { code: '.--', d: `M 220 ${baseY + 3 * deltaY} V ${baseY + 5 * deltaY}` },
+        { code: '.--.', d: `M 220 ${baseY + 5 * deltaY} H 260` },
+        { code: '.---', d: `M 220 ${baseY + 5 * deltaY} V ${baseY + 6 * deltaY}` },
+        { code: '-', d: `M 180 ${baseY - 25} V ${baseY} H 140` },
+        { code: '--', d: `M 140 ${baseY} H 100` },
+        { code: '---', d: `M 100 ${baseY} H 60` },
+        { code: '--.', d: `M 100 ${baseY} V ${baseY + 1 * deltaY}` },
+        { code: '--.-', d: `M 100 ${baseY + 1 * deltaY} H 60 V ${baseY + 2 * deltaY}` },
+        { code: '--..', d: `M 100 ${baseY + 1 * deltaY} V ${baseY + 2 * deltaY}` },
+        { code: '-.', d: `M 140 ${baseY} V ${baseY + 3 * deltaY}` },
+        { code: '-.-', d: `M 140 ${baseY + 3 * deltaY} H 100` },
+        { code: '-.--', d: `M 100 ${baseY + 3 * deltaY} H 60` },
+        { code: '-.-.', d: `M 100 ${baseY + 3 * deltaY} V ${baseY + 4 * deltaY}` },
+        { code: '-..', d: `M 140 ${baseY + 3 * deltaY} V ${baseY + 5 * deltaY}` },
+        { code: '-..-', d: `M 140 ${baseY + 5 * deltaY} H 100` },
+        { code: '-...', d: `M 140 ${baseY + 5 * deltaY} V ${baseY + 6 * deltaY}` }
+      ];
+    }
+
+    let currentCode = '';
+    let autoCommitTimer = null;
+    let audioCtx = null;
+    let activeOscillator = null;
+    let activeGainNode = null;
+
+    let keyActive = false;
+    let keyStartTime = 0;
+    let targetKey = '.';
+    let activeLayout = 'pcb';
+
+    // 介面控制元素
+    const thresholdInput = document.getElementById('threshold-input');
+    const thresholdVal = document.getElementById('threshold-val');
+    const commitInput = document.getElementById('commit-input');
+    const commitVal = document.getElementById('commit-val');
+    const layoutSelect = document.getElementById('layout-select');
+    const keyInput = document.getElementById('key-input');
+    const heightInput = document.getElementById('height-input');
+    const heightVal = document.getElementById('height-val');
+
+    thresholdInput.addEventListener('input', (e) => {
+      thresholdVal.textContent = e.target.value;
+    });
+
+    commitInput.addEventListener('input', (e) => {
+      commitVal.textContent = e.target.value;
+    });
+
+    function updateHeightLabel() {
+      const displayDeltaY = (activeLayout === 'binary') ? Math.round(deltaY * 1.5) : deltaY;
+      heightVal.textContent = displayDeltaY;
+    }
+
+    // 動態更新 deltaY 並重新渲染 SVG 佈局
+    heightInput.addEventListener('input', (e) => {
+      deltaY = parseInt(e.target.value);
+      updateHeightLabel();
+      updateBoardLayout();
+      renderPCB();
+      updateVisuals();
+    });
+
+    layoutSelect.addEventListener('change', (e) => {
+      activeLayout = e.target.value;
+      updateHeightLabel();
+      updateBoardLayout();
+      renderPCB();
+      updateVisuals();
+    });
+
+    // 更新整張卡片外觀、SVG viewBox 以及各組件位置
+    function updateBoardLayout() {
+      const cardContainer = document.querySelector('.card-container');
+      const svgEl = document.getElementById('board-svg');
+      const antenna = document.getElementById('antenna');
+      const topBox = document.getElementById('top-display-rect');
+      const topBoxLabel = document.getElementById('top-display-label');
+      const topBoxText = document.getElementById('top-display-text');
+      const cornerHole = document.getElementById('corner-hole');
+      const homeBtn = document.getElementById('svg-home-btn');
+      const svgBackBtn = document.getElementById('svg-backspace-btn');
+
+      const maxNodeY = baseY + 6 * deltaY;
+      const homeBtnY = maxNodeY + 45;
+      const svgHeight = homeBtnY + 45;
+
+      if (activeLayout === 'pcb') {
+        cardContainer.style.width = '320px';
+        cardContainer.classList.add('pcb-active-layout');
+        cardContainer.classList.remove('binary-active-layout');
+        
+        svgEl.setAttribute('viewBox', `0 0 360 ${svgHeight}`);
+        cardContainer.style.aspectRatio = `360 / ${svgHeight}`;
+        
+        topBox.setAttribute('x', '55');
+        topBox.setAttribute('width', '204');
+        topBoxLabel.setAttribute('x', '65');
+        topBoxText.setAttribute('x', '157');
+        svgBackBtn.setAttribute('transform', 'translate(267, 15)');
+        
+        antenna.setAttribute('transform', 'translate(0, 0)');
+        cornerHole.setAttribute('cx', '335');
+        
+        homeBtn.querySelector('#home-btn-ring').setAttribute('cx', '180');
+        homeBtn.querySelector('#home-btn-ring').setAttribute('cy', homeBtnY);
+        
+        homeBtn.querySelector('#home-btn-square').setAttribute('x', '168');
+        homeBtn.querySelector('#home-btn-square').setAttribute('y', homeBtnY - 12);
+        
+        homeBtn.querySelector('.home-btn-touch').setAttribute('cx', '180');
+        homeBtn.querySelector('.home-btn-touch').setAttribute('cy', homeBtnY);
+      } else {
+        cardContainer.style.width = '480px';
+        cardContainer.classList.add('binary-active-layout');
+        cardContainer.classList.remove('pcb-active-layout');
+        
+        svgEl.setAttribute('viewBox', `0 0 540 ${svgHeight}`); 
+        cardContainer.style.aspectRatio = `540 / ${svgHeight}`;
+        
+        topBox.setAttribute('x', '145');
+        topBox.setAttribute('width', '204');
+        topBoxLabel.setAttribute('x', '155');
+        topBoxText.setAttribute('x', '247');
+        svgBackBtn.setAttribute('transform', 'translate(357, 15)');
+        
+        antenna.setAttribute('transform', 'translate(90, 0)');
+        cornerHole.setAttribute('cx', '515');
+        
+        homeBtn.querySelector('#home-btn-ring').setAttribute('cx', '270');
+        homeBtn.querySelector('#home-btn-ring').setAttribute('cy', homeBtnY);
+        
+        homeBtn.querySelector('#home-btn-square').setAttribute('x', '258');
+        homeBtn.querySelector('#home-btn-square').setAttribute('y', homeBtnY - 12);
+        
+        homeBtn.querySelector('.home-btn-touch').setAttribute('cx', '270');
+        homeBtn.querySelector('.home-btn-touch').setAttribute('cy', homeBtnY);
+      }
+    }
+
+    // 計算二叉樹高度
+    function getBinaryTreeCoords(code) {
+      const L = code.length;
+      const effectiveDeltaY = deltaY * 1.5; 
+      const py = (baseY - 25) + L * effectiveDeltaY; 
+      
+      let val = 0;
+      for (let i = 0; i < L; i++) {
+        val = (val << 1) + (code[i] === '-' ? 1 : 0);
+      }
+      
+      const slots = Math.pow(2, L);
+      const totalWidth = 540;
+      const margin = 20;
+      const interval = (totalWidth - margin * 2) / slots;
+      const px = margin + val * interval + interval / 2;
+      
+      return { x: px, y: py };
+    }
+
+    // 自訂鍵盤按鍵
+    keyInput.addEventListener('click', () => {
+      keyInput.value = '請按鍵鍵盤...';
+      keyInput.style.borderColor = 'var(--pcb-active)';
+      
+      const captureKey = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        targetKey = e.key;
+        keyInput.value = targetKey === ' ' ? '[Space]' : targetKey;
+        keyInput.style.borderColor = 'var(--pcb-gold)';
+        keyInput.blur();
+        window.removeEventListener('keydown', captureKey, true);
+      };
+      window.addEventListener('keydown', captureKey, true);
+    });
+
+    // iOS 專用解鎖 AudioContext
+    function unlockAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => {
+          window.removeEventListener('touchstart', unlockAudio);
+          window.removeEventListener('click', unlockAudio);
+        });
+      }
+    }
+    window.addEventListener('touchstart', unlockAudio, { passive: true });
+    window.addEventListener('click', unlockAudio, { passive: true });
+
+    // Web Audio 發聲器
+    function startTone() {
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        stopTone();
+
+        activeOscillator = audioCtx.createOscillator();
+        activeGainNode = audioCtx.createGain();
+
+        activeOscillator.type = 'sine';
+        activeOscillator.frequency.setValueAtTime(650, audioCtx.currentTime);
+
+        activeGainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+        activeGainNode.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 0.005);
+
+        activeOscillator.connect(activeGainNode);
+        activeGainNode.connect(audioCtx.destination);
+        activeOscillator.start();
+      } catch (e) {
+        console.warn("Audio Context 載入失敗:", e);
+      }
+    }
+
+    function stopTone() {
+      if (activeOscillator) {
+        try {
+          const osc = activeOscillator;
+          const gain = activeGainNode;
+          gain.gain.setValueAtTime(gain.gain.value, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.03);
+          setTimeout(() => {
+            try { osc.stop(); } catch(err){}
+          }, 40);
+        } catch (e) {}
+        activeOscillator = null;
+        activeGainNode = null;
+      }
+    }
+
+    function handlePressStart() {
+      if (keyActive) return;
+      keyActive = true;
+      keyStartTime = Date.now();
+      
+      document.getElementById('tap-btn').classList.add('active-style');
+      document.getElementById('svg-home-btn').classList.add('active');
+      startTone();
+      clearTimeout(autoCommitTimer);
+    }
+
+    function handlePressEnd() {
+      if (!keyActive) return;
+      keyActive = false;
+      
+      document.getElementById('tap-btn').classList.remove('active-style');
+      document.getElementById('svg-home-btn').classList.remove('active');
+      stopTone();
+
+      const duration = Date.now() - keyStartTime;
+      const threshold = parseInt(thresholdInput.value) || 150;
+
+      if (duration >= threshold) {
+        processInput('-');
+      } else {
+        processInput('.');
+      }
+    }
+
+    function processInput(type) {
+      currentCode += type;
+      updateVisuals();
+
+      clearTimeout(autoCommitTimer);
+      const autoCommitDelay = parseInt(commitInput.value) || 1000;
+      autoCommitTimer = setTimeout(() => {
+        commitLetter();
+      }, autoCommitDelay);
+    }
+
+    function updateDecodedDisplay(text) {
+      document.getElementById('decoded-text').textContent = text;
+      document.getElementById('top-display-text').textContent = text;
+    }
+
+    function commitLetter() {
+      clearTimeout(autoCommitTimer);
+      if (!currentCode) return;
+
+      const match = nodesData.find(n => n.code === currentCode);
+      const decodedEl = document.getElementById('decoded-text');
+      if (match) {
+        updateDecodedDisplay(decodedEl.textContent + match.id);
+      } else {
+        updateDecodedDisplay(decodedEl.textContent + '?');
+      }
+
+      setTimeout(() => {
+        currentCode = '';
+        updateVisuals();
+      }, 150);
+    }
+
+    function backspace() {
+      const decodedEl = document.getElementById('decoded-text');
+      let txt = decodedEl.textContent;
+      if (txt.length > 0) {
+        updateDecodedDisplay(txt.slice(0, -1));
+      }
+    }
+
+    function clearAll() {
+      currentCode = '';
+      updateDecodedDisplay('');
+      updateVisuals();
+    }
+
+    // 繪製 PCB
+    function renderPCB() {
+      const tracesLayer = document.getElementById('traces-layer');
+      const nodesLayer = document.getElementById('nodes-layer');
+
+      tracesLayer.innerHTML = '';
+      nodesLayer.innerHTML = '';
+
+      if (activeLayout === 'pcb') {
+        getTracesConfig().forEach(t => {
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', t.d);
+          path.setAttribute('class', 'trace');
+          path.setAttribute('id', `trace-${t.code}`);
+          tracesLayer.appendChild(path);
+        });
+
+        nodesData.forEach(n => {
+          createNodeElement(n, nodesLayer, n.x, n.y, n.tx, n.ty);
+        });
+      } else {
+        nodesData.forEach(n => {
+          const childCoords = getBinaryTreeCoords(n.code);
+          let parentCoords = { x: 270, y: baseY - 25 }; 
+          
+          const parentCode = n.code.slice(0, -1);
+          if (parentCode.length > 0) {
+            parentCoords = getBinaryTreeCoords(parentCode);
+          }
+
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', `M ${parentCoords.x} ${parentCoords.y} L ${childCoords.x} ${childCoords.y}`);
+          path.setAttribute('class', 'trace');
+          path.setAttribute('id', `trace-${n.code}`);
+          tracesLayer.appendChild(path);
+        });
+
+        nodesData.forEach(n => {
+          const coords = getBinaryTreeCoords(n.code);
+          createNodeElement(n, nodesLayer, coords.x, coords.y, 0, -14);
+        });
+      }
+    }
+
+    function createNodeElement(n, layer, cx, cy, tx, ty) {
+      const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      
+      if (n.type === 'circle') {
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', cx);
+        circle.setAttribute('cy', cy);
+        circle.setAttribute('r', '7.5');
+        circle.setAttribute('class', 'node-circle');
+        circle.setAttribute('id', `node-${n.code}`);
+        group.appendChild(circle);
+      } else {
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', cx - 12);
+        rect.setAttribute('y', cy - 6);
+        rect.setAttribute('width', '24');
+        rect.setAttribute('height', '12');
+        rect.setAttribute('rx', '2');
+        rect.setAttribute('class', 'node-rect');
+        rect.setAttribute('id', `node-${n.code}`);
+        group.appendChild(rect);
+      }
+
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', cx + tx);
+      text.setAttribute('y', cy + ty);
+      text.setAttribute('class', 'node-text');
+      text.setAttribute('id', `text-${n.code}`);
+      text.textContent = n.id;
+      group.appendChild(text);
+
+      layer.appendChild(group);
+    }
+
+    function updateVisuals() {
+      document.querySelectorAll('.trace, .node-circle, .node-rect, .node-text').forEach(el => {
+        el.classList.remove('active');
+      });
+
+      let checkCode = '';
+      for (let i = 0; i < currentCode.length; i++) {
+        checkCode += currentCode[i];
+        
+        const traceEl = document.getElementById(`trace-${checkCode}`);
+        if (traceEl) traceEl.classList.add('active');
+
+        const nodeEl = document.getElementById(`node-${checkCode}`);
+        if (nodeEl) nodeEl.classList.add('active');
+
+        const textEl = document.getElementById(`text-${checkCode}`);
+        if (textEl) textEl.classList.add('active');
+      }
+
+      const readableCode = currentCode.replace(/\./g, ' • ').replace(/-/g, ' — ');
+      document.getElementById('current-code').textContent = readableCode || '-';
+    }
+
+    // 鍵盤事件
+    window.addEventListener('keydown', (e) => {
+      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') return;
+      if (e.key === targetKey && !e.repeat) {
+        e.preventDefault();
+        handlePressStart();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.key === targetKey) {
+        e.preventDefault();
+        handlePressEnd();
+      }
+    });
+
+    const tapBtn = document.getElementById('tap-btn');
+    const svgHomeBtn = document.getElementById('svg-home-btn');
+
+    [tapBtn, svgHomeBtn].forEach(btn => {
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        handlePressStart();
+      });
+      btn.addEventListener('mouseup', (e) => {
+        e.preventDefault();
+        handlePressEnd();
+      });
+      btn.addEventListener('mouseleave', () => {
+        handlePressEnd();
+      });
+
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        handlePressStart();
+      }, { passive: false });
+
+      btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        handlePressEnd();
+      }, { passive: false });
+    });
+
+    // SVG 退格鍵事件監聽
+    const svgBackspaceBtn = document.getElementById('svg-backspace-btn');
+    
+    function handleBackspaceStart(e) {
+      e.preventDefault();
+      svgBackspaceBtn.classList.add('active-style');
+      backspace();
+    }
+    
+    function handleBackspaceEnd() {
+      svgBackspaceBtn.classList.remove('active-style');
+    }
+
+    svgBackspaceBtn.addEventListener('mousedown', handleBackspaceStart);
+    svgBackspaceBtn.addEventListener('mouseup', handleBackspaceEnd);
+    svgBackspaceBtn.addEventListener('mouseleave', handleBackspaceEnd);
+    
+    svgBackspaceBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      handleBackspaceStart(e);
+    }, { passive: false });
+    svgBackspaceBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      handleBackspaceEnd();
+    }, { passive: false });
+
+    updateHeightLabel();
+    updateBoardLayout();
+    renderPCB();
+  </script>
+</body>
+</html>

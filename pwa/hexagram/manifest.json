@@ -1,0 +1,21 @@
+{
+    "name": "易經六爻占卜",
+    "short_name": "六爻占卜",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#121212",
+    "theme_color": "#121212",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%231e1e1e'/><circle cx='50' cy='50' r='38' fill='%23e6c260'/><rect x='37' y='37' width='26' height='26' fill='%231e1e1e'/></svg>",
+            "sizes": "192x192",
+            "type": "image/svg+xml"
+        },
+        {
+            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%231e1e1e'/><circle cx='50' cy='50' r='38' fill='%23e6c260'/><rect x='37' y='37' width='26' height='26' fill='%231e1e1e'/></svg>",
+            "sizes": "512x512",
+            "type": "image/svg+xml"
+        }
+    ]
+}

@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <!-- 允許用戶雙指縮放，但透過 CSS 禁用雙擊放大 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>六爻占卜</title>
+  
+  <!-- iOS PWA 核心 Meta 標籤 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="六爻占卜">
+  
+  <!-- 連結 PWA 設定檔與蘋果桌面圖示 -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%231e1e1e'/><circle cx='50' cy='50' r='38' fill='%23e6c260'/><rect x='37' y='37' width='26' height='26' fill='%231e1e1e'/></svg>">
+
+  <style>
+    :root {
+      --bg-color: #121212;
+      --card-bg: #1e1e1e;
+      --text-color: #e0e0e0;
+      --accent-color: #d4af37;
+      --lock-color: #cf6679;
+      --unlock-color: #03dac6;
+      --input-bg: #2a2a2a;
+      --btn-disabled: #3a3a3a;
+      --btn-divine: #2e7d32;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      /* 核心：允許兩指縮放與滾動，但徹底拔除流動端「雙擊放大」的延遲與縮放行為 */
+      touch-action: manipulation; 
+    }
+
+    body {
+      margin: 0;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      height: 100dvh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* 上半部份：28% dvh */
+    .upper-section {
+      height: 28dvh;
+      width: 100vw;
+      display: flex;
+      flex-direction: row;
+      border-bottom: 1px solid #2d2d2d;
+    }
+
+    /* 上左：卦象區 (30% dvw) */
+    .hexagram-part {
+      width: 30dvw;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 4px;
+    }
+
+    .hexagram-name {
+      font-size: 16px;
+      font-weight: bold;
+      color: var(--accent-color);
+      margin-bottom: 4px;
+      text-align: center;
+      height: 22px;
+    }
+
+    .hexagram-visual {
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 5px;
+      width: 100%;
+      height: 75%;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .line-container {
+      width: 100%;
+      height: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* 上右：控制與文字區 (70% dvw) */
+    .control-part {
+      width: 70dvw;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 6px;
+      gap: 6px;
+    }
+
+    pre.copy-textbox {
+      width: 100%;
+      flex: 1;
+      background-color: var(--input-bg);
+      border: 1px solid #3d3d3d;
+      border-radius: 6px;
+      color: var(--text-color);
+      padding: 6px;
+      font-size: 11px;
+      font-family: inherit;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+      text-align: left;
+      overflow-y: auto;
+      touch-action: manipulation; 
+    }
+
+    .btn-row {
+      width: 100%;
+      display: flex;
+      flex-direction: row;
+      gap: 6px;
+    }
+
+    .action-btn {
+      flex: 1;
+      height: 36px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 3px;
+      transition: transform 0.05s ease, opacity 0.05s ease;
+    }
+
+    .action-btn.pressing {
+      opacity: 0.6;
+      transform: scale(0.96);
+    }
+
+    #copyBtn { background-color: var(--accent-color); color: #000; }
+    #restartBtn { background-color: #444; color: #fff; }
+
+    #divineBtn {
+      background-color: var(--btn-disabled);
+      color: #777;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    #divineBtn.active {
+      background-color: var(--btn-divine);
+      color: #fff;
+      pointer-events: auto;
+      opacity: 1;
+    }
+
+    /* 下半部份：金錢控制區 (70% dvh) */
+    .lower-section {
+      height: 70dvh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column-reverse;
+      justify-content: space-around;
+      padding: 6px 8px;
+      background-color: var(--card-bg);
+    }
+
+    .row-container {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      background: rgba(0,0,0,0.25);
+      padding: 4px 8px;
+      border-radius: 8px;
+      transition: opacity 0.2s ease;
+    }
+
+    .lock-btn {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      transition: transform 0.05s ease;
+    }
+    
+    .lock-btn.pressing { transform: scale(0.85); }
+    .lock-btn svg { width: 20px; height: 20px; }
+
+    .coins-group {
+      flex: 1;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      margin-right: 8px;
+    }
+
+    .coin {
+      width: 60px;
+      height: 60px;
+      cursor: pointer;
+      transition: transform 0.05s ease;
+    }
+
+    .coin.pressing { transform: scale(0.85); }
+    .disabled { pointer-events: none; }
+  </style>
+</head>
+<body>
+
+  <div class="upper-section">
+    <div class="hexagram-part">
+      <div class="hexagram-name" id="hexagramName">伏羲</div>
+      <div class="hexagram-visual" id="hexagramVisual"></div>
+    </div>
+    <div class="control-part">
+      <pre class="copy-textbox" id="copyResultText">請點擊下方硬幣起卦</pre>
+      <div class="btn-row">
+        <button class="action-btn" id="copyBtn">📋 複製</button>
+        <button class="action-btn" id="restartBtn">🔄 重置</button>
+        <button class="action-btn" id="divineBtn">🔮 占卦</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lower-section" id="lowerPanel"></div>
+
+  <script>
+    const hexagramsDB = {
+      "111111": { num: 1, name: "乾為天" },   "000000": { num: 2, name: "坤為地" },
+      "100010": { num: 3, name: "水雷屯" },   "010001": { num: 4, name: "山水蒙" },
+      "111010": { num: 5, name: "水天需" },   "010111": { num: 6, name: "天水訟" },
+      "010000": { num: 7, name: "地水師" },   "000010": { num: 8, name: "水地比" },
+      "111011": { num: 9, name: "風天小畜" }, "110111": { num: 10, name: "天澤履" },
+      "111000": { num: 11, name: "地天泰" },  "000111": { num: 12, name: "天地否" },
+      "101111": { num: 13, name: "天火同人" }, "111101": { num: 14, name: "火天大有" },
+      "001000": { num: 15, name: "地山謙" },  "000100": { num: 16, name: "雷地豫" },
+      "100110": { num: 17, name: "澤雷隨" },  "011001": { num: 18, name: "山風蠱" },
+      "110000": { num: 19, name: "地澤臨" },  "000011": { num: 20, name: "風地觀" },
+      "100101": { num: 21, name: "火雷噬嗑" }, "101001": { num: 22, name: "山火賁" },
+      "000001": { num: 23, name: "山地剝" },  "100000": { num: 24, name: "地雷復" },
+      "100111": { num: 25, name: "天雷無妄" }, "111001": { num: 26, name: "山天大畜" },
+      "100001": { num: 27, name: "山雷頤" },  "011110": { num: 28, name: "澤風大過" },
+      "010010": { num: 29, name: "坎為水" },  "101101": { num: 30, name: "離為火" },
+      "001110": { num: 31, name: "澤山咸" },  "011100": { num: 32, name: "雷風恆" },
+      "001111": { num: 33, name: "天山遁" },  "111100": { num: 34, name: "雷天大壯" },
+      "000101": { num: 35, name: "火地晉" },  "101000": { num: 36, name: "地火明夷" },
+      "101011": { num: 37, name: "風火家人" }, "110101": { num: 38, name: "火澤睽" },
+      "001010": { num: 49, name: "水山蹇" },  "010100": { num: 40, name: "雷水解" },
+      "110001": { num: 41, name: "山澤損" },  "100011": { num: 42, name: "風雷益" },
+      "111110": { num: 43, name: "澤天夬" },  "011111": { num: 44, name: "天風姤" },
+      "000110": { num: 45, name: "澤地萃" },  "011000": { num: 46, name: "地風升" },
+      "010110": { num: 47, name: "澤水困" },  "011010": { num: 48, name: "水風井" },
+      "101110": { num: 49, name: "澤火革" },  "011101": { num: 50, name: "火風鼎" },
+      "100100": { num: 51, name: "震為雷" },  "001001": { num: 52, name: "艮為山" },
+      "001011": { num: 53, name: "風山漸" },  "110100": { num: 54, name: "雷澤歸妹" },
+      "101100": { num: 55, name: "雷火豐" },  "001101": { num: 56, name: "火山旅" },
+      "011011": { num: 57, name: "巽為風" },  "110110": { num: 58, name: "兌為澤" },
+      "010011": { num: 59, name: "風水渙" },  "110010": { num: 60, name: "水澤節" },
+      "110011": { num: 61, name: "風澤中孚" }, "001100": { num: 62, name: "雷山小過" },
+      "010101": { num: 63, name: "水火既濟" }, "101010": { num: 64, name: "火水未濟" }
+    };
+
+    let appState = Array.from({ length: 6 }, () => ({ coins: [0, 0, 0], locked: false }));
+    let firstClickTime = null;
+    let isDivined = false;
+
+    const SVGS = {
+      lock: `<svg viewBox="0 0 24 24" fill="none" stroke="var(--lock-color)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`,
+      unlock: `<svg viewBox="0 0 24 24" fill="none" stroke="var(--unlock-color)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>`,
+      coinGrey: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="#3a3a3a" stroke="#555" stroke-width="3"/><rect x="38" y="38" width="24" height="24" fill="#121212" stroke="#555" stroke-width="2"/></svg>`,
+      coinUp: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="#e6c260" stroke="#ffffff" stroke-width="3.5"/><circle cx="50" cy="50" r="37" fill="#aa841c"/><rect x="37" y="37" width="26" height="26" fill="#1e1e1e" stroke="#ffffff" stroke-width="2.5"/><path d="M 50 12 C 42 16, 42 24, 50 28 C 58 24, 58 16, 50 12 Z" fill="none" stroke="#ffffff" stroke-width="1.5"/><path d="M 22 40 C 12 55, 25 75, 34 78" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/><path d="M 78 40 C 88 55, 75 75, 66 78" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/><path d="M 42 85 C 50 88, 58 88, 58 85" fill="none" stroke="#ffffff" stroke-width="1.5"/></svg>`,
+      coinDown: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="#705423" stroke="#bfa36f" stroke-width="3.5"/><circle cx="50" cy="50" r="37" fill="#382a13"/><rect x="37" y="37" width="26" height="26" fill="#1e1e1e" stroke="#bfa36f" stroke-width="2.5"/><text x="50" y="27" font-family="DFKai-SB, serif" font-size="16" fill="#bfa36f" font-weight="bold" text-anchor="middle">大</text><text x="50" y="84" font-family="DFKai-SB, serif" font-size="16" fill="#bfa36f" font-weight="bold" text-anchor="middle">吉</text><text x="23" y="56" font-family="DFKai-SB, serif" font-size="16" fill="#bfa36f" font-weight="bold" text-anchor="middle">大</text><text x="77" y="56" font-family="DFKai-SB, serif" font-size="16" fill="#bfa36f" font-weight="bold" text-anchor="middle">利</text></svg>`
+    };
+
+    // 1. 金錢區/鎖定區 專用：不需安全權限，採用 pointerdown 達到真正的「零延遲」變換
+    function bindSnappyTouch(element, callback) {
+      element.addEventListener('pointerdown', (e) => {
+        element.classList.add('pressing');
+        callback();
+      });
+      element.addEventListener('pointerup', () => element.classList.remove('pressing'));
+      element.addEventListener('pointerleave', () => element.classList.remove('pressing'));
+    }
+
+    // 2. 上方按鈕區 專用：分離視覺反饋與行為執行。iOS 必須在 click 事件內才允許執行剪貼簿複製
+    function bindSafeActionButton(element, callback) {
+      element.addEventListener('pointerdown', () => element.classList.add('pressing'));
+      element.addEventListener('pointerup', () => element.classList.remove('pressing'));
+      element.addEventListener('pointerleave', () => element.classList.remove('pressing'));
+      element.addEventListener('click', callback);
+    }
+
+    const lowerPanel = document.getElementById('lowerPanel');
+    for (let i = 0; i < 6; i++) {
+      const rowDiv = document.createElement('div');
+      rowDiv.className = 'row-container';
+      rowDiv.id = `row-${i}`;
+
+      const coinsGroup = document.createElement('div');
+      coinsGroup.className = 'coins-group';
+      coinsGroup.id = `coins-group-${i}`;
+
+      for (let c = 0; c < 3; c++) {
+        const coinDiv = document.createElement('div');
+        coinDiv.className = 'coin';
+        coinDiv.id = `coin-${i}-${c}`;
+        coinDiv.innerHTML = SVGS.coinGrey;
+        
+        bindSnappyTouch(coinDiv, () => fillCoinLoop(i, c));
+        coinsGroup.appendChild(coinDiv);
+      }
+
+      const lockBtn = document.createElement('button');
+      lockBtn.className = 'lock-btn';
+      lockBtn.id = `lock-btn-${i}`;
+      lockBtn.innerHTML = SVGS.unlock;
+      
+      bindSnappyTouch(lockBtn, () => toggleLock(i));
+
+      rowDiv.appendChild(coinsGroup);
+      rowDiv.appendChild(lockBtn);
+      lowerPanel.appendChild(rowDiv);
+    }
+
+    // 將上方按鈕切換為 iOS 安全手勢綁定
+    bindSafeActionButton(document.getElementById('copyBtn'), copyToClipboard);
+    bindSafeActionButton(document.getElementById('restartBtn'), restartApp);
+    bindSafeActionButton(document.getElementById('divineBtn'), startDivination);
+
+    function fillCoinLoop(rowIndex, coinIndex) {
+      if (appState[rowIndex].locked) return;
+      if (!firstClickTime) {
+        firstClickTime = new Date();
+        showInitialTime(); 
+      }
+      let curr = appState[rowIndex].coins[coinIndex];
+      let next = (curr + 1) % 3;
+      appState[rowIndex].coins[coinIndex] = next;
+      updateCoinUI(rowIndex, coinIndex, next);
+      calculateHexagram();
+    }
+
+    function updateCoinUI(rowIndex, coinIndex, state) {
+      const coinEl = document.getElementById(`coin-${rowIndex}-${coinIndex}`);
+      if (state === 0) coinEl.innerHTML = SVGS.coinGrey;
+      else if (state === 1) coinEl.innerHTML = SVGS.coinUp;
+      else if (state === 2) coinEl.innerHTML = SVGS.coinDown;
+    }
+
+    function toggleLock(rowIndex) {
+      appState[rowIndex].locked = !appState[rowIndex].locked;
+      document.getElementById(`lock-btn-${rowIndex}`).innerHTML = appState[rowIndex].locked ? SVGS.lock : SVGS.unlock;
+      updateRowVisibility();
+      calculateHexagram();
+    }
+
+    function updateRowVisibility() {
+      let activeIdx = 0;
+      while (activeIdx < 6 && appState[activeIdx].locked) { activeIdx++; }
+      let allSixLocked = true;
+      for (let i = 0; i < 6; i++) {
+        const rowDiv = document.getElementById(`row-${i}`);
+        const coinsGroupEl = document.getElementById(`coins-group-${i}`);
+        const lockBtnEl = document.getElementById(`lock-btn-${i}`);
+        if (!appState[i].locked) allSixLocked = false;
+
+        if (i < activeIdx) {
+          rowDiv.style.opacity = "0.6";
+          coinsGroupEl.classList.add('disabled');
+          lockBtnEl.classList.remove('disabled');
+        } else if (i === activeIdx) {
+          rowDiv.style.opacity = "1.0";
+          coinsGroupEl.classList.remove('disabled');
+          lockBtnEl.classList.remove('disabled');
+        } else {
+          rowDiv.style.opacity = "0.1";
+          coinsGroupEl.classList.add('disabled');
+          lockBtnEl.classList.add('disabled');
+        }
+      }
+      const divineBtn = document.getElementById('divineBtn');
+      if (allSixLocked) { divineBtn.classList.add('active'); } 
+      else { divineBtn.classList.remove('active'); isDivined = false; }
+    }
+
+    function getTimeString() {
+      if (!firstClickTime) return "";
+      const y = firstClickTime.getFullYear();
+      const m = firstClickTime.getMonth() + 1;
+      const d = firstClickTime.getDate();
+      const hr = String(firstClickTime.getHours()).padStart(2, '0');
+      const min = String(firstClickTime.getMinutes()).padStart(2, '0');
+      const sec = String(firstClickTime.getSeconds()).padStart(2, '0');
+      return `香港時間${y}年${m}月${d}日${hr}時${min}分${sec}秒。\r\n`;
+    }
+
+    function showInitialTime() {
+      if (!isDivined) {
+        document.getElementById('copyResultText').innerText = getTimeString() + "六爻未全，請繼續鎖定並點擊占卦。";
+      }
+    }
+
+    function startDivination() {
+      if (!appState.every(row => row.locked)) return;
+      isDivined = true;
+      calculateHexagram();
+    }
+
+    function calculateHexagram() {
+      const visualContainer = document.getElementById('hexagramVisual');
+      visualContainer.innerHTML = '';
+      let binaryCode = "";
+      let changedLines = [];
+
+      for (let i = 0; i < 6; i++) {
+        const row = appState[i].coins;
+        if (row.includes(0)) { renderPlaceholderLine(); continue; }
+        const upCount = row.filter(x => x === 1).length;
+        const downCount = row.filter(x => x === 2).length;
+        let lineType = ""; let bit = "";      
+
+        if (upCount === 3) { lineType = "old-yang"; bit = "1"; changedLines.push(i + 1); } 
+        else if (upCount === 2 && downCount === 1) { lineType = "young-yang"; bit = "1"; } 
+        else if (upCount === 1 && downCount === 2) { lineType = "young-yin"; bit = "0"; } 
+        else if (downCount === 3) { lineType = "old-yin"; bit = "0"; changedLines.push(i + 1); }
+        binaryCode += bit;
+        renderHexagramLine(lineType);
+      }
+
+      const nameDisplay = document.getElementById('hexagramName');
+      const textPre = document.getElementById('copyResultText');
+
+      if (!isDivined) {
+        nameDisplay.innerText = "伏羲";
+        if (firstClickTime) showInitialTime();
+        else textPre.innerText = "請點擊下方硬幣起卦";
+      } else {
+        const hData = hexagramsDB[binaryCode];
+        if (hData) {
+          nameDisplay.innerText = `${hData.num}. ${hData.name}`;
+          let changeStr = changedLines.length > 0 ? `第 ${changedLines.join(', ')} 爻有變數。` : "無變數。";
+          textPre.innerText = `${getTimeString()}第 ${hData.num} 卦 - ${hData.name}。\r\n${changeStr}`;
+        } else {
+          nameDisplay.innerText = "未知卦象";
+          textPre.innerText = "未知卦象資訊";
+        }
+      }
+    }
+
+    function renderHexagramLine(type) {
+      const visualContainer = document.getElementById('hexagramVisual');
+      const container = document.createElement('div');
+      container.className = 'line-container';
+      let strokeColor = "#ffd700";
+      let svgContent = "";
+
+      if (type === "young-yang" || type === "old-yang") {
+        svgContent = `<line x1="40" y1="6" x2="160" y2="6" stroke="${strokeColor}" stroke-width="6"/>`;
+      } else if (type === "young-yin" || type === "old-yin") {
+        svgContent = `
+          <line x1="40" y1="6" x2="95" y2="6" stroke="${strokeColor}" stroke-width="6"/>
+          <line x1="105" y1="6" x2="160" y2="6" stroke="${strokeColor}" stroke-width="6"/>`;
+      }
+
+      if (type === "old-yang") {
+        svgContent += `<circle cx="178" cy="6" r="4" fill="none" stroke="${strokeColor}" stroke-width="2"/>`;
+      } else if (type === "old-yin") {
+        svgContent += `<path d="M 174 2 L 182 10 M 182 2 L 174 10" stroke="${strokeColor}" stroke-width="2" stroke-linecap="round"/>`;
+      }
+
+      container.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 200 12">${svgContent}</svg>`;
+      visualContainer.appendChild(container);
+    }
+
+    function renderPlaceholderLine() {
+      const visualContainer = document.getElementById('hexagramVisual');
+      const container = document.createElement('div');
+      container.className = 'line-container';
+      container.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 200 12"><line x1="40" y1="6" x2="160" y2="6" stroke="#444" stroke-width="3" stroke-dasharray="6,4"/></svg>`;
+      visualContainer.appendChild(container);
+    }
+
+    // 核心優化：整合新版 Clipboard API 與舊版 Textarea Fallback 的雙層安全複製機制
+    function copyToClipboard() {
+      if (!isDivined) return;
+      const textPre = document.getElementById('copyResultText');
+      const textToCopy = textPre.innerText;
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textToCopy)
+          .then(() => showCopySuccess())
+          .catch(() => fallbackCopyMethod(textToCopy));
+      } else {
+        fallbackCopyMethod(textToCopy);
+      }
+    }
+
+    // 針對 iOS PWA 的後備文字選取複製法
+    function fallbackCopyMethod(text) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      // 避免頁面捲動跳轉
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      
+      textArea.focus();
+      textArea.select();
+      // 兼容舊版 iOS Webview 選擇範圍
+      textArea.setSelectionRange(0, 99999); 
+
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) showCopySuccess();
+      } catch (err) {
+        console.error("無法複製文字", err);
+      }
+      document.body.removeChild(textArea);
+    }
+
+    function showCopySuccess() {
+      const copyBtn = document.getElementById('copyBtn');
+      copyBtn.innerText = "✅ 已複製";
+      setTimeout(() => { copyBtn.innerText = "📋 複製"; }, 1200);
+    }
+
+    function restartApp() {
+      firstClickTime = null; isDivined = false;
+      appState = Array.from({ length: 6 }, () => ({ coins: [0, 0, 0], locked: false }));
+      for (let i = 0; i < 6; i++) {
+        document.getElementById(`lock-btn-${i}`).innerHTML = SVGS.unlock;
+        for (let c = 0; c < 3; c++) { updateCoinUI(i, c, 0); }
+      }
+      updateRowVisibility(); calculateHexagram();
+    }
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+
+    updateRowVisibility();
+    calculateHexagram();
+  </script>
+</body>
+</html>

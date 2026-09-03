@@ -1,0 +1,22 @@
+{
+    "name": "MORSE CODE PCB",
+    "short_name": "摩斯電路板",
+    "description": "單按鍵發報與雙佈局切換的摩斯解碼電路板",
+    "start_url": "./morse_code_iOS.html",
+    "display": "standalone",
+    "background_color": "#0f1115",
+    "theme_color": "#c5a880",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
